@@ -1,0 +1,183 @@
+﻿@page "/"
+@using Microsoft.Extensions.Logging
+
+@inject ILogger<Index> Logger
+
+<img src="https://user-images.githubusercontent.com/4441470/224455560-91ed3ee7-f510-4041-a8d2-3fc093025112.png" />
+<h1>Soenneker.Quark.NumericEdits demo</h1>
+<p>Usage examples with validation.</p>
+<br />
+
+<hr />
+
+<div class="container py-3">
+    <div class="row g-3">
+        <div class="col-auto">
+            <label class="form-label">Default</label>
+            <NumericEdit @bind-Value="value1" Placeholder="Enter a number" />
+        </div>
+        <div class="col-auto">
+            <label class="form-label">Small</label>
+            <NumericEdit @bind-Value="value2" Size="Size.Small" />
+        </div>
+        <div class="col-auto">
+            <label class="form-label">With min/max/step</label>
+            <NumericEdit @bind-Value="value3" Min="0" Max="10" Step="0.5m" />
+        </div>
+    </div>
+    <div class="mt-3 text-muted">
+        <div>Value1: @value1</div>
+        <div>Value2: @value2</div>
+        <div>Value3: @value3</div>
+    </div>
+    
+    <div class="mt-4">
+        <label class="form-label">Disabled</label>
+        <NumericEdit Value="42" Disabled="true" />
+    </div>
+
+    <div class="mt-4">
+        <label class="form-label">Readonly</label>
+        <NumericEdit Value="21" ReadOnly="true" />
+    </div>
+
+    <hr class="my-4" />
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quark.Validations (custom validator)</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Demonstrates live validation with custom rules.</p>
+
+                    <Validation @ref="_validation" Validator="@ValidateNumber">
+                        <label class="form-label">Amount (between 1 and 100)</label>
+                        <NumericEdit @bind-Value="_customValue" Placeholder="1 - 100" />
+
+                        @if (_validation?.Status == ValidationStatus.Error)
+                        {
+                            <div class="invalid-feedback d-block">@string.Join(", ", _validation.Messages ?? new List<string>())</div>
+                        }
+                        else if (_validation?.Status == ValidationStatus.Success)
+                        {
+                            <div class="valid-feedback d-block">Looks good.</div>
+                        }
+                    </Validation>
+
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@ValidateCustom">Validate</button>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="@ClearCustom">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">EditForm + DataAnnotations</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Integrates with EditForm to show field-level messages.</p>
+
+                    <EditForm Model="@_formModel" OnValidSubmit="@HandleSubmit">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                            <NumericEdit @bind-Value="_formModel.Quantity" Min="0" Max="1000" />
+                            <ValidationMessage For="@(() => _formModel.Quantity)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Price <span class="text-danger">*</span></label>
+                            <NumericEdit @bind-Value="_formModel.Price" Min="0.01m" Step="0.01m" />
+                            <ValidationMessage For="@(() => _formModel.Price)" class="text-danger" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </EditForm>
+
+                    @if (!string.IsNullOrEmpty(_result))
+                    {
+                        <div class="alert alert-success mt-3">
+                            @_result
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+
+    protected override void OnInitialized()
+    {
+    }
+
+    private decimal? value1 { get; set; } = 0m;
+    private decimal? value2 { get; set; } = 5m;
+    private decimal? value3 { get; set; } = 2.5m;
+
+    // Custom validator demo
+    private Validation? _validation;
+    private decimal? _customValue { get; set; }
+
+    private void ValidateNumber(ValidatorEventArgs e)
+    {
+        // Required and numeric range check
+        if (!_customValue.HasValue)
+        {
+            e.Status = ValidationStatus.Error;
+            e.ErrorText = "A value is required.";
+            return;
+        }
+
+        var value = _customValue.Value;
+        if (value < 1 || value > 100)
+        {
+            e.Status = ValidationStatus.Error;
+            e.ErrorText = "Value must be between 1 and 100.";
+            return;
+        }
+
+        e.Status = ValidationStatus.Success;
+        e.ErrorText = null;
+    }
+
+    private async Task ValidateCustom()
+    {
+        if (_validation is not null)
+            await _validation.ValidateAsync();
+    }
+
+    private void ClearCustom()
+    {
+        _validation?.Clear();
+        _customValue = null;
+        StateHasChanged();
+    }
+
+    // EditForm + DataAnnotations demo
+    private FormModel _formModel { get; set; } = new();
+    private string _result = string.Empty;
+
+    private void HandleSubmit()
+    {
+        _result = $"Submitted. Quantity: {_formModel.Quantity}, Price: {_formModel.Price}";
+    }
+
+    public sealed class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.Range(0, 1000)]
+        public decimal? Quantity { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.Range(typeof(decimal), "0.01", "79228162514264337593543950335")]
+        public decimal? Price { get; set; }
+    }
+}
