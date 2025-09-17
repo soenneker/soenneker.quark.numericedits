@@ -1,183 +1,191 @@
-@using Microsoft.AspNetCore.Components.Web
 @using System.Globalization
-@using Soenneker.Quark.Enums.Colors
 @using Soenneker.Quark.Enums.Size
 @using Soenneker.Quark.Validations
 @using Soenneker.Quark.Validations.Enums
 @using System.Linq.Expressions
+@using Soenneker.Blazor.Extensions.EventCallback
+@using Soenneker.Quark.Dtos.Colors
 @inherits Soenneker.Quark.Components.Element
 @implements Soenneker.Quark.Validations.Abstract.IValidationInput
 
 <input type="number" @attributes="BuildAttributes()" />
 
 @code {
-    [Parameter]
-    public decimal? Value { get; set; }
 
-    [Parameter]
-    public string? Placeholder { get; set; }
+	[Parameter]
+	public decimal? Value { get; set; }
 
-    [Parameter]
-    public bool Disabled { get; set; }
+	[Parameter]
+	public string? Placeholder { get; set; }
 
-    [Parameter]
-    public bool ReadOnly { get; set; }
+	[Parameter]
+	public bool Disabled { get; set; }
 
-    [Parameter]
-    public bool Required { get; set; }
+	[Parameter]
+	public bool ReadOnly { get; set; }
 
-    [Parameter]
-    public decimal? Min { get; set; }
+	[Parameter]
+	public bool Required { get; set; }
 
-    [Parameter]
-    public decimal? Max { get; set; }
+	[Parameter]
+	public decimal? Min { get; set; }
 
-    [Parameter]
-    public decimal? Step { get; set; }
+	[Parameter]
+	public decimal? Max { get; set; }
 
-    [Parameter]
-    public Color Color { get; set; } = Color.Primary;
+	[Parameter]
+	public decimal? Step { get; set; }
 
-    [Parameter]
-    public Size Size { get; set; } = Size.Default;
+	[Parameter]
+	public Color Color { get; set; } = Color.Primary;
 
-    [Parameter]
-    public EventCallback<decimal?> ValueChanged { get; set; }
+	[Parameter]
+	public Size Size { get; set; } = Size.Default;
 
-    [Parameter]
-    public Expression<Func<decimal?>>? ValueExpression { get; set; }
+	[Parameter]
+	public EventCallback<decimal?> ValueChanged { get; set; }
 
-    [Parameter]
-    public EventCallback<ChangeEventArgs> OnChange { get; set; }
+	[Parameter]
+	public Expression<Func<decimal?>>? ValueExpression { get; set; }
 
-    [Parameter]
-    public EventCallback<ChangeEventArgs> OnInput { get; set; }
+	[Parameter]
+	public EventCallback<ChangeEventArgs> OnChange { get; set; }
 
-    [CascadingParameter]
-    public Validation? ParentValidation { get; set; }
+	[Parameter]
+	public EventCallback<ChangeEventArgs> OnInput { get; set; }
 
-    public object? ValidationValue => Value;
+	[CascadingParameter]
+	public Validation? ParentValidation { get; set; }
 
-    private static decimal? ParseDecimal(ChangeEventArgs e)
-    {
-        if (e?.Value == null)
-            return null;
+	public object? ValidationValue => Value;
 
-        var text = e.Value.ToString();
-        if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var result))
-            return result;
+	private static decimal? ParseDecimal(ChangeEventArgs e)
+	{
+		if (e?.Value == null)
+			return null;
 
-        return null;
-    }
+		var text = e.Value.ToString();
 
-    private async Task HandleInput(ChangeEventArgs e)
-    {
-        Value = ParseDecimal(e);
-        await ValueChanged.InvokeAsync(Value);
-        if (OnInput.HasDelegate)
-            await OnInput.InvokeAsync(e);
+		if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal result))
+			return result;
 
-        if (ParentValidation is not null)
-            await ParentValidation.NotifyInputChanged(Value);
-    }
+		return null;
+	}
 
-    private async Task HandleChange(ChangeEventArgs e)
-    {
-        Value = ParseDecimal(e);
-        await ValueChanged.InvokeAsync(Value);
-        if (OnChange.HasDelegate)
-            await OnChange.InvokeAsync(e);
+	private async Task HandleInput(ChangeEventArgs e)
+	{
+		Value = ParseDecimal(e);
+		await ValueChanged.InvokeIfHasDelegate(Value);
 
-        if (ParentValidation is not null)
-            await ParentValidation.NotifyInputChanged(Value);
-    }
+		await OnInput.InvokeIfHasDelegate(e);
 
-    private string? GetSizeClass()
-    {
-        if (Size == Size.Small)
-            return "form-control-sm";
-        if (Size == Size.Large)
-            return "form-control-lg";
-        return null;
-    }
+		if (ParentValidation is not null)
+			await ParentValidation.NotifyInputChanged(Value);
+	}
 
-    private string? GetColorClass()
-    {
-        return $"form-control-{Color.Value}";
-    }
+	private async Task HandleChange(ChangeEventArgs e)
+	{
+		Value = ParseDecimal(e);
+		await ValueChanged.InvokeIfHasDelegate(Value);
 
-    private string? GetValidationClass()
-    {
-        if (ParentValidation?.Status == ValidationStatus.Error)
-            return "is-invalid";
-        else if (ParentValidation?.Status == ValidationStatus.Success)
-            return "is-valid";
+		await OnChange.InvokeIfHasDelegate(e);
 
-        return null;
-    }
+		if (ParentValidation is not null)
+			await ParentValidation.NotifyInputChanged(Value);
+	}
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && ParentValidation is not null)
-        {
-            await ParentValidation.InitializeInput(this);
-            if (ValueExpression is not null)
-            {
-                await ParentValidation.InitializeInputExpression(ValueExpression);
-            }
-        }
+	private string? GetSizeClass()
+	{
+		if (Size == Size.Small)
+			return "form-control-sm";
+		if (Size == Size.Large)
+			return "form-control-lg";
 
-        await base.OnAfterRenderAsync(firstRender);
-    }
+		return null;
+	}
 
-    protected override Dictionary<string, object> BuildAttributes()
-    {
-        Dictionary<string, object> attributes = base.BuildAttributes();
+	private string? GetColorClass()
+	{
+		if (Color.IsTheme)
+			return $"form-control-{Color.Theme!.Value}";
 
-        var baseClasses = "form-control";
-        string? colorClass = GetColorClass();
-        string? sizeClass = GetSizeClass();
-        string? validationClass = GetValidationClass();
+		return null;
+	}
 
-        if (colorClass != null)
-            baseClasses = $"{baseClasses} {colorClass}";
-        if (sizeClass != null)
-            baseClasses = $"{baseClasses} {sizeClass}";
-        if (validationClass != null)
-            baseClasses = $"{baseClasses} {validationClass}";
+	private string? GetValidationClass()
+	{
+		if (ParentValidation?.Status == ValidationStatus.Error)
+			return "is-invalid";
 
-        attributes["class"] = AppendToClass(attributes.GetValueOrDefault("class")
-            ?.ToString(), baseClasses);
+		if (ParentValidation?.Status == ValidationStatus.Success)
+			return "is-valid";
 
-        if (Value.HasValue)
-            attributes["value"] = Value.Value.ToString(CultureInfo.InvariantCulture);
+		return null;
+	}
 
-        if (!string.IsNullOrEmpty(Placeholder))
-            attributes["placeholder"] = Placeholder;
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender && ParentValidation is not null)
+		{
+			await ParentValidation.InitializeInput(this);
 
-        if (Disabled)
-            attributes["disabled"] = true;
+			if (ValueExpression is not null)
+			{
+				await ParentValidation.InitializeInputExpression(ValueExpression);
+			}
+		}
 
-        if (ReadOnly)
-            attributes["readonly"] = true;
+		await base.OnAfterRenderAsync(firstRender);
+	}
 
-        if (Required)
-            attributes["required"] = true;
+	protected override Dictionary<string, object> BuildAttributes()
+	{
+		Dictionary<string, object> attributes = base.BuildAttributes();
 
-        if (Min.HasValue)
-            attributes["min"] = Min.Value.ToString(CultureInfo.InvariantCulture);
+		var baseClasses = "form-control";
+		string? colorClass = GetColorClass();
+		string? sizeClass = GetSizeClass();
+		string? validationClass = GetValidationClass();
 
-        if (Max.HasValue)
-            attributes["max"] = Max.Value.ToString(CultureInfo.InvariantCulture);
+		if (colorClass != null)
+			baseClasses = $"{baseClasses} {colorClass}";
+		if (sizeClass != null)
+			baseClasses = $"{baseClasses} {sizeClass}";
+		if (validationClass != null)
+			baseClasses = $"{baseClasses} {validationClass}";
 
-        if (Step.HasValue)
-            attributes["step"] = Step.Value.ToString(CultureInfo.InvariantCulture);
+		attributes["class"] = AppendToClass(attributes.GetValueOrDefault("class")
+			?.ToString(), baseClasses);
 
-        // Wire input/change events to keep Value in sync without using @bind on this element
-        attributes["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInput);
-        attributes["onchange"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange);
+		if (Value.HasValue)
+			attributes["value"] = Value.Value.ToString(CultureInfo.InvariantCulture);
 
-        return attributes;
-    }
+		if (!string.IsNullOrEmpty(Placeholder))
+			attributes["placeholder"] = Placeholder;
+
+		if (Disabled)
+			attributes["disabled"] = true;
+
+		if (ReadOnly)
+			attributes["readonly"] = true;
+
+		if (Required)
+			attributes["required"] = true;
+
+		if (Min.HasValue)
+			attributes["min"] = Min.Value.ToString(CultureInfo.InvariantCulture);
+
+		if (Max.HasValue)
+			attributes["max"] = Max.Value.ToString(CultureInfo.InvariantCulture);
+
+		if (Step.HasValue)
+			attributes["step"] = Step.Value.ToString(CultureInfo.InvariantCulture);
+
+		// Wire input/change events to keep Value in sync without using @bind on this element
+		attributes["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInput);
+		attributes["onchange"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange);
+
+		return attributes;
+	}
 
 }
